@@ -2,92 +2,83 @@ import streamlit as st
 import pandas as pd
 import os
 import pickle
-from datetime import datetime
-import requests
 
-# Paths
-DATA_FILE = 'kurser.pkl'
+# Konfiguration
+st.set_page_config(page_title="Kursbyggare", layout="wide")
+st.title("📚 Kursbyggare")
 
-# Load or initialize data
+DATA_FILE = "kursdata.pkl"
+
+# Spara / ladda funktioner
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'rb') as f:
             return pickle.load(f)
-    else:
-        return {}
+    return []
 
 def save_data(data):
     with open(DATA_FILE, 'wb') as f:
         pickle.dump(data, f)
 
-# Send SMS
-def send_sms(to, message):
-    response = requests.post('https://api.46elks.com/a1/sms',
-        auth=('uc9ebbbf8541d29fcbbd04c310a174f69', 'C92D0F039B88E7961EC9B72B17C3BAE8'),
-        data={
-            'from': 'ElksWelcome',
-            'to': to,
-            'message': message
-        })
-    return response.text
+# Formulär
+with st.form("kurs_form"):
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.header("Kursinfo")
+        kursnamn = st.text_input("Kursnamn")
+        skola = st.text_input("Skola")
+        poäng = st.number_input("Antal poäng", min_value=0)
+        timmar_vecka = st.number_input("Timmar/vecka", min_value=0)
+        dagar = st.number_input("Antal dagar", min_value=0)
+        tid = st.selectbox("Tid", ["Förmiddag", "Eftermiddag", "Kväll"])
+        fil = st.file_uploader("Ladda upp fil", type=["pdf", "docx", "xlsx"])
 
-# App setup
-st.set_page_config(page_title="Kursbyggare", layout="wide")
-st.title("📚 Kursbyggare")
+        st.markdown("### Ämnen (SoU)")
+        ämnen = ["Ledarskap", "Kommunikation", "Organisation", "Etik", "Arbetsmiljö", "Konflikthantering"]
+        valda_ämnen = [ämne for ämne in ämnen if st.checkbox(ämne)]
 
-# Load stored data
-data = load_data()
+    with col2:
+        st.header("Planering")
+        tidsperiod = st.radio("Välj planeringstyp", ["Månad", "Vecka", "Dag"])
+        planering = st.select_slider(f"Välj {tidsperiod.lower()}:", options=[f"{i}" for i in range(1, 32)])
 
-# Upload and parse Excel file
-st.sidebar.header("1. Ladda upp kursfil")
-uploaded_file = st.sidebar.file_uploader("Välj en Excel-fil", type=["xlsx"])
+        gruppuppgift = st.text_input("Gruppuppgift / Lämning")
+        tenta_antal = st.number_input("Tenta – Träffar (antal)", min_value=0, step=1)
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-    data['kurser'] = df
-    save_data(data)
-    st.success("Fil uppladdad och sparad!")
+        st.subheader("POP – Förslag / Arbetsmaterial")
+        pop_vals = []
+        for i in range(6):
+            pop_vals.append(st.text_input(f"POP-förslag {i+1}", key=f"pop{i}"))
 
-# Display current data
-if 'kurser' in data:
-    df = data['kurser']
+    submitted = st.form_submit_button("💾 Spara kurs")
 
-    # Filtrera på vecka och ort
-    st.sidebar.header("2. Filtrera")
-    vecka = st.sidebar.number_input("Vecka", min_value=1, max_value=52, step=1)
-    ort = st.sidebar.text_input("Ort")
-    max_tid = st.sidebar.number_input("Max resetid (minuter)", min_value=0, max_value=300, step=10)
-
-    filtrerad_df = df.copy()
-    if vecka:
-        filtrerad_df = filtrerad_df[filtrerad_df['Vecka'] == vecka]
-    if ort:
-        filtrerad_df = filtrerad_df[filtrerad_df['Ort'].str.contains(ort, case=False, na=False)]
-    if max_tid > 0 and 'Resetid' in filtrerad_df.columns:
-        filtrerad_df = filtrerad_df[filtrerad_df['Resetid'] <= max_tid]
-
-    st.subheader("📚 Kurser")
-    st.dataframe(filtrerad_df)
-
-# Kommunikation
-st.sidebar.header("3. Kommunikation")
-recipient_type = st.sidebar.selectbox("Mottagare", ["Kund", "Kursledare"])
-telefonnummer = st.sidebar.text_input("Telefonnummer (ex: +4670xxxxxxx)")
-meddelande = st.sidebar.text_area("Meddelande")
-
-if st.sidebar.button("Skicka SMS"):
-    if telefonnummer and meddelande:
-        sms_logg = data.get('sms_logg', [])
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        sms_logg.append({'tid': timestamp, 'till': telefonnummer, 'meddelande': meddelande, 'typ': recipient_type})
-        data['sms_logg'] = sms_logg
+    if submitted:
+        kurs = {
+            "Kursnamn": kursnamn,
+            "Skola": skola,
+            "Poäng": poäng,
+            "Timmar/vecka": timmar_vecka,
+            "Dagar": dagar,
+            "Tid": tid,
+            "Tidsperiod": tidsperiod,
+            "Planering": planering,
+            "Ämnen": valda_ämnen,
+            "Gruppuppgift": gruppuppgift,
+            "Tenta antal": tenta_antal,
+            "POP-förslag": [p for p in pop_vals if p]
+        }
+        data = load_data()
+        data.append(kurs)
         save_data(data)
-        response = send_sms(telefonnummer, meddelande)
-        st.sidebar.success("SMS skickat!")
-    else:
-        st.sidebar.warning("Fyll i både telefonnummer och meddelande.")
+        st.success("Kursen sparades!")
 
-# Historik
-if 'sms_logg' in data:
-    st.subheader("🕓 Kommunikationshistorik")
-    st.dataframe(pd.DataFrame(data['sms_logg']))
+# Visa sparade kurser
+st.markdown("---")
+st.header("📂 Sparade kurser")
+all_data = load_data()
+if all_data:
+    df = pd.DataFrame(all_data)
+    st.dataframe(df)
+else:
+    st.info("Inga kurser har sparats än.")
