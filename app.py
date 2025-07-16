@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import pickle
 from datetime import date
+from streamlit_sortable import sortable
 
 st.set_page_config(page_title="Kursbyggare", layout="wide")
 st.title("📚 Kursbyggare")
@@ -40,7 +41,7 @@ with st.form("kurs_form"):
 
     with col2:
         st.header("Planering")
-        planeringsdatum = st.date_input("Välj datum för planering", value=date.today())
+        planeringsdatum = st.date_input("Välj startdatum för veckan", value=date.today())
 
         gruppuppgift = st.text_input("Gruppuppgift / Lämning")
         tenta_antal = st.number_input("Tenta – Träffar (antal)", min_value=0, step=1)
@@ -71,32 +72,42 @@ with st.form("kurs_form"):
         save_data(data)
         st.success("Kursen sparades!")
 
-# ----- Schemaläggning av valda ämnen -----
+# ----- Drag-and-drop planering av ämnen -----
 st.markdown("---")
-st.header("📅 Planera ämnen")
+st.header("📅 Dra och släpp ämnen till veckodagar")
+
+veckodagar = ["Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag", "Lördag", "Söndag"]
+initial_items = {dag: [] for dag in veckodagar}
 
 if valda_ämnen:
-    ämnesplanering = {}
-    for ämne in valda_ämnen:
-        with st.expander(f"📘 {ämne}"):
-            datum = st.date_input(f"Välj datum för {ämne}", key=ämne+"_datum")
-            kommentar = st.text_area("Kommentar / aktivitet", key=ämne+"_kommentar")
-            ämnesplanering[ämne] = {
-                "Datum": str(datum),
-                "Kommentar": kommentar
-            }
+    if "dnd_planering" not in st.session_state:
+        st.session_state["dnd_planering"] = initial_items
+        st.session_state["dnd_planering"]["Ämnen"] = valda_ämnen
 
-    if st.button("💾 Spara ämnesplanering"):
-        st.session_state["ämnesplanering"] = ämnesplanering
+    updated_planering = sortable(
+        st.session_state["dnd_planering"],
+        direction="horizontal",
+        multi_containers=True,
+        container_style={"minHeight": "200px", "border": "1px solid lightgray", "padding": "10px"},
+        item_style={"padding": "8px", "margin": "4px", "backgroundColor": "#f0f0f0", "borderRadius": "5px"}
+    )
+
+    st.session_state["dnd_planering"] = updated_planering
+
+    if st.button("💾 Spara vecko-planering"):
         st.success("Planering sparad!")
 
-# ----- Visning av planering -----
-if "ämnesplanering" in st.session_state:
-    st.markdown("### 🗂️ Planeringsöversikt")
-    df = pd.DataFrame.from_dict(st.session_state["ämnesplanering"], orient="index")
+# ----- Visa planering i tabell -----
+if "dnd_planering" in st.session_state:
+    st.subheader("📊 Planeringsöversikt")
+    plan_data = []
+    for dag, items in st.session_state["dnd_planering"].items():
+        for ämne in items:
+            plan_data.append({"Dag": dag, "Ämne": ämne})
+    df = pd.DataFrame(plan_data)
     st.dataframe(df)
 
-# ----- Sparade kurser -----
+# ----- Visa sparade kurser -----
 st.markdown("---")
 st.header("📂 Sparade kurser")
 all_data = load_data()
