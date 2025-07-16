@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 import pickle
+from datetime import date
 
 st.set_page_config(page_title="Kursbyggare", layout="wide")
 st.title("📚 Kursbyggare")
@@ -39,8 +40,7 @@ with st.form("kurs_form"):
 
     with col2:
         st.header("Planering")
-        tidsperiod = st.radio("Välj planeringstyp", ["Månad", "Vecka", "Dag"])
-        planeringsruta = st.text_input(f"Ange {tidsperiod.lower()} (t.ex. Mars, V12 eller 2025-07-30)")
+        planeringsdatum = st.date_input("Välj datum för planering", value=date.today())
 
         gruppuppgift = st.text_input("Gruppuppgift / Lämning")
         tenta_antal = st.number_input("Tenta – Träffar (antal)", min_value=0, step=1)
@@ -60,8 +60,7 @@ with st.form("kurs_form"):
             "Timmar/vecka": timmar_vecka,
             "Dagar": dagar,
             "Tid": tid,
-            "Tidsperiod": tidsperiod,
-            "Planeringstid": planeringsruta,
+            "Planeringsdatum": str(planeringsdatum),
             "Ämnen": valda_ämnen,
             "Gruppuppgift": gruppuppgift,
             "Tenta antal": tenta_antal,
@@ -80,10 +79,12 @@ if valda_ämnen:
     ämnesplanering = {}
     for ämne in valda_ämnen:
         with st.expander(f"📘 {ämne}"):
-            typ = st.selectbox("Typ av planering", ["Månad", "Vecka", "Dag"], key=ämne+"_typ")
-            när = st.text_input(f"Vilken {typ.lower()}?", key=ämne+"_tid")
+            datum = st.date_input(f"Välj datum för {ämne}", key=ämne+"_datum")
             kommentar = st.text_area("Kommentar / aktivitet", key=ämne+"_kommentar")
-            ämnesplanering[ämne] = {"Typ": typ, "Tid": när, "Kommentar": kommentar}
+            ämnesplanering[ämne] = {
+                "Datum": str(datum),
+                "Kommentar": kommentar
+            }
 
     if st.button("💾 Spara ämnesplanering"):
         st.session_state["ämnesplanering"] = ämnesplanering
