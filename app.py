@@ -3,13 +3,12 @@ import pandas as pd
 import os
 import pickle
 
-# Konfiguration
 st.set_page_config(page_title="Kursbyggare", layout="wide")
 st.title("📚 Kursbyggare")
 
 DATA_FILE = "kursdata.pkl"
 
-# Spara / ladda funktioner
+# ----- Hjälpfunktioner -----
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, 'rb') as f:
@@ -20,7 +19,7 @@ def save_data(data):
     with open(DATA_FILE, 'wb') as f:
         pickle.dump(data, f)
 
-# Formulär
+# ----- Formulär: Kursinformation -----
 with st.form("kurs_form"):
     col1, col2 = st.columns([1, 2])
     
@@ -41,7 +40,7 @@ with st.form("kurs_form"):
     with col2:
         st.header("Planering")
         tidsperiod = st.radio("Välj planeringstyp", ["Månad", "Vecka", "Dag"])
-        planering = st.select_slider(f"Välj {tidsperiod.lower()}:", options=[f"{i}" for i in range(1, 32)])
+        planeringsruta = st.text_input(f"Ange {tidsperiod.lower()} (t.ex. Mars, V12 eller 2025-07-30)")
 
         gruppuppgift = st.text_input("Gruppuppgift / Lämning")
         tenta_antal = st.number_input("Tenta – Träffar (antal)", min_value=0, step=1)
@@ -62,7 +61,7 @@ with st.form("kurs_form"):
             "Dagar": dagar,
             "Tid": tid,
             "Tidsperiod": tidsperiod,
-            "Planering": planering,
+            "Planeringstid": planeringsruta,
             "Ämnen": valda_ämnen,
             "Gruppuppgift": gruppuppgift,
             "Tenta antal": tenta_antal,
@@ -73,12 +72,34 @@ with st.form("kurs_form"):
         save_data(data)
         st.success("Kursen sparades!")
 
-# Visa sparade kurser
+# ----- Schemaläggning av valda ämnen -----
+st.markdown("---")
+st.header("📅 Planera ämnen")
+
+if valda_ämnen:
+    ämnesplanering = {}
+    for ämne in valda_ämnen:
+        with st.expander(f"📘 {ämne}"):
+            typ = st.selectbox("Typ av planering", ["Månad", "Vecka", "Dag"], key=ämne+"_typ")
+            när = st.text_input(f"Vilken {typ.lower()}?", key=ämne+"_tid")
+            kommentar = st.text_area("Kommentar / aktivitet", key=ämne+"_kommentar")
+            ämnesplanering[ämne] = {"Typ": typ, "Tid": när, "Kommentar": kommentar}
+
+    if st.button("💾 Spara ämnesplanering"):
+        st.session_state["ämnesplanering"] = ämnesplanering
+        st.success("Planering sparad!")
+
+# ----- Visning av planering -----
+if "ämnesplanering" in st.session_state:
+    st.markdown("### 🗂️ Planeringsöversikt")
+    df = pd.DataFrame.from_dict(st.session_state["ämnesplanering"], orient="index")
+    st.dataframe(df)
+
+# ----- Sparade kurser -----
 st.markdown("---")
 st.header("📂 Sparade kurser")
 all_data = load_data()
 if all_data:
-    df = pd.DataFrame(all_data)
-    st.dataframe(df)
+    st.dataframe(pd.DataFrame(all_data))
 else:
     st.info("Inga kurser har sparats än.")
