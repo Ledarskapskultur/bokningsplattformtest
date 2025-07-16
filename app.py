@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import os
@@ -33,8 +32,8 @@ def send_sms(to, message):
     return response.text
 
 # App setup
-st.set_page_config(page_title="Bokningsplattform", layout="wide")
-st.title("📅 Bokningsförmedling – Kurser & Kommunikation")
+st.set_page_config(page_title="Kursbyggare", layout="wide")
+st.title("📚 Kursbyggare")
 
 # Load stored data
 data = load_data()
